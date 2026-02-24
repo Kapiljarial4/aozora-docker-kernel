@@ -1,0 +1,124 @@
+name: Build Aozora Kernel with Docker Support
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex \
+          g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev \
+          lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev \
+          libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync \
+          schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 unzip
+
+    - name: Extract Aozora kernel
+      run: |
+        unzip Aozora-Kernel-*.zip -d aozora-extracted
+        cd aozora-extracted
+        # AnyKernel3 structure - extract Image.gz-dtb
+        if [ -f Image.gz-dtb ]; then
+          echo "Found kernel image"
+        fi
+
+    - name: Clone kernel source
+      run: |
+        git clone --depth=1 -b lineage-20 https://github.com/LineageOS/android_kernel_xiaomi_sdm845 kernel-source
+
+    - name: Apply Docker configs
+      run: |
+        cd kernel-source
+        cat >> arch/arm64/configs/vendor/sdm845_defconfig << 'EOF'
+# Docker/Container Support
+CONFIG_CGROUP_DEVICE=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_PID_NS=y
+CONFIG_USER_NS=y
+CONFIG_IPC_NS=y
+CONFIG_UTS_NS=y
+CONFIG_OVERLAY_FS=y
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_MEMCG=y
+CONFIG_MEMCG_SWAP=y
+CONFIG_BLK_CGROUP=y
+CONFIG_BLK_DEV_THROTTLING=y
+CONFIG_CFS_BANDWIDTH=y
+CONFIG_FAIR_GROUP_SCHED=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_VETH=y
+CONFIG_BRIDGE=y
+CONFIG_BRIDGE_NETFILTER=y
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+CONFIG_IP_NF_TARGET_MASQUERADE=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+CONFIG_VXLAN=y
+EOF
+
+    - name: Clone toolchain
+      run: |
+        git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+
+    - name: Build kernel
+      run: |
+        cd kernel-source
+        export PATH="$(pwd)/../clang/bin:${PATH}"
+        export ARCH=arm64
+        export SUBARCH=arm64
+        make O=out ARCH=arm64 vendor/sdm845_defconfig
+        make -j$(nproc --all) O=out \
+          ARCH=arm64 \
+          CC=clang \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+    - name: Prepare AnyKernel3
+      run: |
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
+        cd AnyKernel3
+        rm -f Image.gz-dtb
+        cp ../kernel-source/out/arch/arm64/boot/Image.gz-dtb ./
+
+        cat > anykernel.sh << 'AKSH'
+# AnyKernel3 Script
+properties() { '
+do.devicecheck=1
+do.modules=0
+do.systemless=1
+do.cleanup=1
+device.name1=beryllium
+device.name2=Pocophone F1
+supported.versions=13
+'; }
+block=/dev/block/bootdevice/by-name/boot;
+is_slot_device=0;
+ramdisk_compression=auto;
+. tools/ak3-core.sh;
+dump_boot;
+write_boot;
+AKSH
+
+    - name: Create flashable zip
+      run: |
+        cd AnyKernel3
+        zip -r9 ../Aozora-Docker-Kernel-$(date +%Y%m%d).zip * -x .git README.md *placeholder
+
+    - name: Upload kernel
+      uses: actions/upload-artifact@v3
+      with:
+        name: Aozora-Docker-Kernel
+        path: |
+          kernel-source/out/arch/arm64/boot/Image.gz-dtb
+          Aozora-Docker-Kernel-*.zip
