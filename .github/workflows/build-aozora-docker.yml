@@ -20,7 +20,8 @@ jobs:
           g++-multilib gcc-multilib git gnupg gperf imagemagick \
           lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev \
           libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync \
-          schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3
+          schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 \
+          gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
     - name: Clone kernel source
       run: |
@@ -57,23 +58,13 @@ jobs:
         CONFIG_VXLAN=y
         DOCKEREOF
 
-    - name: Clone toolchain
-      run: |
-        mkdir -p toolchain
-        cd toolchain
-        wget -q https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/master.tar.gz -O aarch64.tar.gz
-        wget -q https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/heads/master.tar.gz -O arm.tar.gz
-        mkdir -p aarch64 arm
-        tar xzf aarch64.tar.gz -C aarch64
-        tar xzf arm.tar.gz -C arm
-
     - name: Build kernel
       run: |
         cd kernel-source
         export ARCH=arm64
         export SUBARCH=arm64
-        export CROSS_COMPILE=$(pwd)/../toolchain/aarch64/bin/aarch64-linux-android-
-        export CROSS_COMPILE_ARM32=$(pwd)/../toolchain/arm/bin/arm-linux-androideabi-
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         make O=out ARCH=arm64 vendor/sdm845_defconfig
         make -j$(nproc --all) O=out ARCH=arm64
 
