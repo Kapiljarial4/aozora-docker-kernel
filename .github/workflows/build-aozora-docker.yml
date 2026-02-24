@@ -59,21 +59,23 @@ jobs:
 
     - name: Clone toolchain
       run: |
-        git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+        mkdir -p toolchain
+        cd toolchain
+        wget -q https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/master.tar.gz -O aarch64.tar.gz
+        wget -q https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/heads/master.tar.gz -O arm.tar.gz
+        mkdir -p aarch64 arm
+        tar xzf aarch64.tar.gz -C aarch64
+        tar xzf arm.tar.gz -C arm
 
     - name: Build kernel
       run: |
         cd kernel-source
-        export PATH="$(pwd)/../clang/bin:${PATH}"
         export ARCH=arm64
         export SUBARCH=arm64
+        export CROSS_COMPILE=$(pwd)/../toolchain/aarch64/bin/aarch64-linux-android-
+        export CROSS_COMPILE_ARM32=$(pwd)/../toolchain/arm/bin/arm-linux-androideabi-
         make O=out ARCH=arm64 vendor/sdm845_defconfig
-        make -j$(nproc --all) O=out \
-          ARCH=arm64 \
-          CC=clang \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        make -j$(nproc --all) O=out ARCH=arm64
 
     - name: Prepare AnyKernel3
       run: |
