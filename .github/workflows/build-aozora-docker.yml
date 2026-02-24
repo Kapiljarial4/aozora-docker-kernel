@@ -56,6 +56,10 @@ jobs:
         CONFIG_IP_NF_TARGET_MASQUERADE=y
         CONFIG_IP6_NF_TARGET_MASQUERADE=y
         CONFIG_VXLAN=y
+        # Disable problematic drivers (Codex recommendation)
+        # CONFIG_SND_SOC_ELLIPTIC is not set
+        # CONFIG_EFI is not set
+        # CONFIG_EFI_STUB is not set
         DOCKEREOF
 
     - name: Build kernel
