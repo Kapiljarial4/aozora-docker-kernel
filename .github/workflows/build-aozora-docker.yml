@@ -106,7 +106,7 @@ jobs:
         zip -r9 ../Aozora-Docker-Kernel-$(date +%Y%m%d).zip * -x .git README.md *placeholder
 
     - name: Upload kernel
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Aozora-Docker-Kernel
         path: |
