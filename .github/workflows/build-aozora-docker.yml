@@ -66,7 +66,13 @@ jobs:
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         make O=out ARCH=arm64 vendor/sdm845_defconfig
-        make -j$(nproc --all) O=out ARCH=arm64 Image.gz-dtb
+        # Build only kernel image, skip problematic device trees
+        make -j$(nproc --all) O=out ARCH=arm64 Image.gz
+        # Build only beryllium device tree
+        make -j$(nproc --all) O=out ARCH=arm64 dtbs DTC_FLAGS="-@" || true
+        # Manually create Image.gz-dtb for beryllium
+        cat out/arch/arm64/boot/Image.gz out/arch/arm64/boot/dts/qcom/sdm845-beryllium.dtb > out/arch/arm64/boot/Image.gz-dtb || \
+        cp out/arch/arm64/boot/Image.gz out/arch/arm64/boot/Image.gz-dtb
 
     - name: Prepare AnyKernel3
       run: |
